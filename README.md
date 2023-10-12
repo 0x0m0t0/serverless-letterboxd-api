@@ -19,3 +19,9 @@ bun run deploy
 USER=/letterboxdUsername
 URL=https://letterboxd.com/letterboxdUsername/rss
 ```
+
+## Live API
+
+```
+/feed
+```
