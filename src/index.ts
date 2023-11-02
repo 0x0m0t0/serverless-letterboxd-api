@@ -1,15 +1,19 @@
 import { Hono } from "hono";
+import { bearerAuth } from "hono/bearer-auth";
 import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
 import { XMLParser } from "fast-xml-parser";
+import { env } from "hono/adapter";
 
-type Bindings = {
+type Env = {
+  TOKEN: string;
   URL: string;
   USER: string;
   PASSWORD: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: Env }>();
+
 app.use("*", cors());
 
 const regex = /<img[^>]*src="([^"]*)"[^>]*>/;
@@ -61,7 +65,29 @@ app.use("*", prettyJSON());
 
 app.get("/", (c) => c.text("hello welcome to your personal letterboxd api"));
 
-app.get("/feed", async (c) => {
+// app.get("/env", (c) => {
+//   const test = c.env.TOKEN;
+//   console.log(test);
+
+//   console.log("helloo where my key");
+//   return c.text("heee");
+// });
+
+app.use("/api/*", async (c, next) => {
+  const token = c.env.TOKEN;
+  try {
+    const auth = bearerAuth({
+      token: token,
+    });
+    console.log("middleware secure");
+
+    return await auth(c, next);
+  } catch {
+    return c.text("hello error somewhere");
+  }
+});
+
+app.get("/api/feed", async (c, next) => {
   try {
     const response = await fetchRssFeed(c.env.URL, c.env.USER);
     console.log(response);
