@@ -1,6 +1,11 @@
-# Personal Letterboxd API from Letterboxd RSS deployed to cloudflare workers
+# Personal serverless Letterboxd API
+----
 
-### Small personal serverless API
+- Letterboxd RSS converted to serverless REST API
+- Deployed to Cloudflare Workers
+
+
+## Install
 
 ```
 bun install
