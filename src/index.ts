@@ -5,14 +5,14 @@ import { cors } from "hono/cors";
 import { XMLParser } from "fast-xml-parser";
 import { env } from "hono/adapter";
 
-type Env = {
+type Bindings = {
   TOKEN: string;
   URL: string;
   USER: string;
   PASSWORD: string;
 };
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Bindings }>();
 
 app.use("*", cors());
 
@@ -65,26 +65,17 @@ app.use("*", prettyJSON());
 
 app.get("/", (c) => c.text("hello welcome to your personal letterboxd api"));
 
-// app.get("/env", (c) => {
-//   const test = c.env.TOKEN;
-//   console.log(test);
-
-//   console.log("helloo where my key");
-//   return c.text("heee");
-// });
+const getTokenFromEnvironment = (c: any) => {
+  const { TOKEN } = env<{ TOKEN: string }>(c);
+  return TOKEN;
+};
 
 app.use("/api/*", async (c, next) => {
-  const token = c.env.TOKEN;
-  try {
-    const auth = bearerAuth({
-      token: token,
-    });
-    console.log("middleware secure");
-
-    return await auth(c, next);
-  } catch {
-    return c.text("hello error somewhere");
-  }
+  const token = getTokenFromEnvironment(c);
+  const auth = bearerAuth({
+    token: token,
+  });
+  await auth(c, next);
 });
 
 app.get("/api/feed", async (c, next) => {
