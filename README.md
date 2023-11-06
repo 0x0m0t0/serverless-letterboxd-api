@@ -39,8 +39,8 @@ TOKEN="YourUserGeneratedToken" #special characters might cause issues
 /api/feed
 ```
 
-## Auth
+## Auth Header
 
 ```
-"Bearer" + Token
+Authorization: Bearer Token
 ```
