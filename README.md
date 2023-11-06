@@ -13,6 +13,10 @@ npm install wrangler --save-dev
 bun run dev
 ```
 
+## wrangler.toml file
+
+Remove the .example from wrangler.toml.example or copy the values into wrangler.toml file
+
 ## Deploy to Cloudflare
 
 ```
