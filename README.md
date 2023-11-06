@@ -9,6 +9,7 @@
 
 ```
 bun install
+npm install wrangler --save-dev
 bun run dev
 ```
 
@@ -17,6 +18,8 @@ bun run dev
 ```
 bun run deploy
 ```
+
+& add your .env variables in your worker
 
 ## Add variables in cloudflare
 
@@ -29,7 +32,7 @@ TOKEN="YourUserGeneratedToken" #special characters might cause issues
 ## Live API
 
 ```
-/feed
+/api/feed
 ```
 
 ## Auth
