@@ -1,0 +1,11 @@
+name = "letterboxd-api"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+minify = true
+
+# [vars]
+# MY_VARIABLE = "production_value"
+
+# [[kv_namespaces]]
+# binding = "MY_KV_NAMESPACE"
+# id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
