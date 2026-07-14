@@ -3,98 +3,88 @@ import { bearerAuth } from 'hono/bearer-auth';
 import { prettyJSON } from 'hono/pretty-json';
 import { cors } from 'hono/cors';
 import { XMLParser } from 'fast-xml-parser';
-import { env } from 'hono/adapter';
 
 type Bindings = {
   TOKEN: string;
   URL: string;
   USER: string;
-  PASSWORD: string;
+};
+
+type FeedItem = {
+  title?: string;
+  link?: string;
+  description?: string;
+  'letterboxd:filmTitle'?: string | number;
+  'letterboxd:filmYear'?: number;
+  'letterboxd:memberRating'?: number;
+  'letterboxd:memberLike'?: string;
+  'letterboxd:rewatch'?: string;
+  'letterboxd:watchedDate'?: string;
+  'tmdb:movieId'?: number;
+};
+
+const posterRegex = /<img[^>]*src="([^"]*)"[^>]*>/;
+
+const toStars = (rating: number) =>
+  '★'.repeat(Math.floor(rating)) + (rating % 1 ? '½' : '');
+
+// isArray: feeds with a single entry parse as an object instead of an array
+// htmlEntities: decode &#039; etc. in film titles
+const parser = new XMLParser({
+  isArray: (name) => name === 'item',
+  htmlEntities: true,
+});
+
+const fetchFeed = async (url: string, user: string) => {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'personal-letterboxd-api' },
+    cf: { cacheTtl: 300, cacheEverything: true },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Letterboxd responded with status ${response.status}`);
+  }
+
+  const feed = parser.parse(await response.text());
+  const items: FeedItem[] = feed?.rss?.channel?.item ?? [];
+
+  return items.map((item) => {
+    const rating = item['letterboxd:memberRating'] ?? null;
+
+    return {
+      title: item['letterboxd:filmTitle'] ?? item.title ?? null,
+      year: item['letterboxd:filmYear'] ?? null,
+      rating,
+      stars: rating !== null ? toStars(rating) : null,
+      liked: item['letterboxd:memberLike'] === 'Yes',
+      rewatch: item['letterboxd:rewatch'] === 'Yes',
+      link: item.link?.replace(user, '') ?? null,
+      poster: item.description?.match(posterRegex)?.[1] ?? null,
+      watchedOn: item['letterboxd:watchedDate'] ?? null,
+      tmdbId: item['tmdb:movieId'] ?? null,
+    };
+  });
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use('*', cors());
-
-const regex = /<img[^>]*src="([^"]*)"[^>]*>/;
-const regexStars = /[★½]+/g;
-const regexTitle = /([^,]+), \d{4}/;
-const regexYear = /\b\d{4}\b/;
-
-const fetchRssFeed = async (url: string, user: string) => {
-  try {
-    const response = await fetch(url);
-    console.log('Response status:', response.status);
-    console.log('Response URL:', response.url);
-    console.log('Response text:', await response.text());
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch XML. Status: ${response.status}`);
-    }
-
-    const xmlData = await response.text();
-
-    const parser = new XMLParser();
-    const feed = parser.parse(xmlData);
-
-    if (feed !== null) {
-      const data = feed?.rss?.channel?.item?.map((item: any) => {
-        const mtch = item?.description?.match(regex);
-        const poster = mtch ? mtch[1] : null;
-
-        return {
-          title: item?.title?.match(regexTitle)?.[1],
-          // year: item?.title?.match(regexYear)?.[0],
-          year: item?.['letterboxd:filmYear'],
-          stars: item?.title?.match(regexStars)?.[0] ? item.title.match(regexStars)?.[0] : null,
-          link: item?.link?.replace(user, ''),
-          poster: poster,
-          watchedOn: new Date(item?.['letterboxd:watchedDate']),
-        };
-      });
-      return data;
-    }
-  } catch (error) {
-    return {
-      status: 500,
-      message: error,
-    };
-  }
-};
-
 app.use('*', prettyJSON());
 
 app.get('/', (c) => c.text('hello welcome to your personal letterboxd api'));
 
-const getTokenFromEnvironment = (c: any) => {
-  const { TOKEN } = env<{ TOKEN: string }>(c);
-  return TOKEN;
-};
+app.use('/api/*', (c, next) =>
+  bearerAuth<{ Bindings: Bindings }>({ token: c.env.TOKEN })(c, next)
+);
 
-app.use('/api/*', async (c, next) => {
-  const token = getTokenFromEnvironment(c);
-  const auth = bearerAuth({
-    token: token,
-  });
-  console.log('yeeha authorized');
-  await auth(c, next);
-});
-
-app.get('/api/feed', async (c, next) => {
+app.get('/api/feed', async (c) => {
   try {
-    const response = await fetchRssFeed(c.env.URL, c.env.USER);
-    console.log(response);
+    const response = await fetchFeed(c.env.URL, c.env.USER);
     return c.json({ status: 200, response });
   } catch (error) {
-    c.json({
-      status: 500,
-      message: 'Internal Server Error',
-    });
+    console.error('Failed to fetch Letterboxd feed:', error);
+    return c.json({ status: 502, message: 'Failed to fetch Letterboxd feed' }, 502);
   }
 });
 
-// export default app;
-export default {
-  port: 3000,
-  fetch: app.fetch,
-};
+export default app;
